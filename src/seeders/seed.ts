@@ -372,8 +372,13 @@ const main = async () => {
   await sequelize.close();
 };
 
-main().catch(async (error) => {
-  console.error(error);
-  await sequelize.close();
-  process.exit(1);
-});
+main()
+  .then(() => {
+    console.log('Seed completed successfully');
+    process.exit(0);
+  })
+  .catch(async (error) => {
+    console.error('Seed failed:', error);
+    await sequelize.close();
+    process.exit(1);
+  });
