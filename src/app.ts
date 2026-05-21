@@ -43,7 +43,10 @@ app.use(
   })
 );
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
+const rateLimitMax = Number(process.env.RATE_LIMIT_MAX || (process.env.NODE_ENV === 'production' ? 1200 : 10000));
+
+app.use('/api', rateLimit({ windowMs: rateLimitWindowMs, limit: rateLimitMax, standardHeaders: true, legacyHeaders: false }));
 app.use(express.json());
 app.use('/uploads', express.static(uploadRoot));
 
