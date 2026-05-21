@@ -6,9 +6,11 @@ import {
   finishScheduledMatch,
   getCmsBlocks,
   getNextMatches,
+  getSettings,
   startScheduledMatch,
   updateCmsBlock,
-  updateNextMatch
+  updateNextMatch,
+  updateSettings
 } from '../controllers/cmsController';
 import { adminMiddleware, authMiddleware } from '../middleware/authMiddleware';
 import { validateBody } from '../middleware/validationMiddleware';
@@ -16,6 +18,8 @@ import { cmsBlockSchema, cmsBlockUpdateSchema, finishNextMatchSchema, nextMatchS
 
 export const cmsRoutes = Router();
 
+cmsRoutes.get('/settings', getSettings);
+cmsRoutes.put('/settings', authMiddleware, adminMiddleware, updateSettings);
 cmsRoutes.get('/blocks', getCmsBlocks);
 cmsRoutes.post('/blocks', authMiddleware, adminMiddleware, validateBody(cmsBlockSchema), createCmsBlock);
 cmsRoutes.put('/blocks/:id', authMiddleware, adminMiddleware, validateBody(cmsBlockUpdateSchema), updateCmsBlock);

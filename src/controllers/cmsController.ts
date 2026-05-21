@@ -1,7 +1,42 @@
 import { Request, Response } from 'express';
-import { CmsBlock, NextMatch, Team } from '../models';
+import { AppSetting, CmsBlock, NextMatch, Team } from '../models';
 import { activateDueNextMatches, finishNextMatch, startNextMatch } from '../services/matchService';
 import { fail, ok } from '../utils/http';
+
+const validCardDesigns = ['standard', 'gold'];
+const validSiteDesigns = ['classic', 'premium'];
+
+export const getSettings = async (_req: Request, res: Response) => {
+  const [cardDesign, siteDesign] = await Promise.all([
+    AppSetting.findByPk('cardDesign'),
+    AppSetting.findByPk('siteDesign')
+  ]);
+  return ok(res, {
+    cardDesign: validCardDesigns.includes(cardDesign?.value || '') ? cardDesign?.value : 'standard',
+    siteDesign: validSiteDesigns.includes(siteDesign?.value || '') ? siteDesign?.value : 'classic'
+  });
+};
+
+export const updateSettings = async (req: Request, res: Response) => {
+  const { cardDesign, siteDesign } = req.body;
+  if (cardDesign !== undefined && !validCardDesigns.includes(cardDesign)) return fail(res, 'Dizajn kartice mora biti standard ili gold.');
+  if (siteDesign !== undefined && !validSiteDesigns.includes(siteDesign)) return fail(res, 'Dizajn sajta mora biti classic ili premium.');
+  if (cardDesign === undefined && siteDesign === undefined) return fail(res, 'Nije poslat dizajn za cuvanje.');
+
+  await Promise.all([
+    cardDesign !== undefined ? AppSetting.upsert({ key: 'cardDesign', value: cardDesign }) : Promise.resolve(),
+    siteDesign !== undefined ? AppSetting.upsert({ key: 'siteDesign', value: siteDesign }) : Promise.resolve()
+  ]);
+
+  const [savedCardDesign, savedSiteDesign] = await Promise.all([
+    AppSetting.findByPk('cardDesign'),
+    AppSetting.findByPk('siteDesign')
+  ]);
+  return ok(res, {
+    cardDesign: validCardDesigns.includes(savedCardDesign?.value || '') ? savedCardDesign?.value : 'standard',
+    siteDesign: validSiteDesigns.includes(savedSiteDesign?.value || '') ? savedSiteDesign?.value : 'classic'
+  });
+};
 
 export const getCmsBlocks = async (_req: Request, res: Response) => {
   const blocks = await CmsBlock.findAll({ order: [['sortOrder', 'ASC'], ['createdAt', 'DESC']] });

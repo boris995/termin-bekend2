@@ -11,6 +11,9 @@ interface PlayerAttributes {
   position: PlayerPosition;
   shirtNumber: number;
   cardImageUrl?: string | null;
+  cardImageX: number;
+  cardImageY: number;
+  cardImageScale: number;
   galleryImages: string[];
   pac: number;
   sho: number;
@@ -28,7 +31,23 @@ interface PlayerAttributes {
 
 type PlayerCreationAttributes = Optional<
   PlayerAttributes,
-  'id' | 'nickname' | 'cardImageUrl' | 'galleryImages' | 'pac' | 'sho' | 'pas' | 'dri' | 'def' | 'phy' | 'overallRating' | 'goals' | 'assists' | 'showOnHome'
+  | 'id'
+  | 'nickname'
+  | 'cardImageUrl'
+  | 'cardImageX'
+  | 'cardImageY'
+  | 'cardImageScale'
+  | 'galleryImages'
+  | 'pac'
+  | 'sho'
+  | 'pas'
+  | 'dri'
+  | 'def'
+  | 'phy'
+  | 'overallRating'
+  | 'goals'
+  | 'assists'
+  | 'showOnHome'
 >;
 
 export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> implements PlayerAttributes {
@@ -39,6 +58,9 @@ export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> im
   declare position: PlayerPosition;
   declare shirtNumber: number;
   declare cardImageUrl: string | null;
+  declare cardImageX: number;
+  declare cardImageY: number;
+  declare cardImageScale: number;
   declare galleryImages: string[];
   declare pac: number;
   declare sho: number;
@@ -63,6 +85,9 @@ Player.init(
     position: { type: DataTypes.ENUM('golman', 'igrac', 'golman-igrac'), allowNull: false },
     shirtNumber: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
     cardImageUrl: { type: DataTypes.STRING, allowNull: true },
+    cardImageX: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    cardImageY: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    cardImageScale: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 1, validate: { min: 0.5, max: 2.5 } },
     galleryImages: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
     pac: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 50, validate: { min: 0, max: 99 } },
     sho: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 50, validate: { min: 0, max: 99 } },

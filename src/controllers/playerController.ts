@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Player, Team } from '../models';
+import { Player, PlayerMatchStat, Team } from '../models';
 import { fail, ok } from '../utils/http';
 
 const ratingKeys = ['pac', 'sho', 'pas', 'dri', 'def', 'phy'] as const;
@@ -18,9 +18,18 @@ export const getTeamPlayers = async (req: Request, res: Response) => {
 };
 
 export const getPlayer = async (req: Request, res: Response) => {
-  const player = await Player.findByPk(Number(req.params.id), { include: ['team', 'matchStats'] });
+  const player = await Player.findByPk(Number(req.params.id), { include: ['team'] });
   if (!player) return fail(res, 'Igrac nije pronadjen.', 404);
-  return ok(res, player);
+  const matchStats = await PlayerMatchStat.findAll({
+    where: { playerId: player.id },
+    include: [
+      'team',
+      { association: 'match', include: ['homeTeam', 'awayTeam', 'winnerTeam'] }
+    ],
+    order: [['id', 'DESC']],
+    limit: 8
+  });
+  return ok(res, { ...player.toJSON(), matchStats });
 };
 
 export const createPlayer = async (req: Request, res: Response) => {
@@ -34,6 +43,9 @@ export const createPlayer = async (req: Request, res: Response) => {
       teamId,
       seasonId,
       cardImageUrl,
+      cardImageX = 0,
+      cardImageY = 0,
+      cardImageScale = 1,
       galleryImages = [],
       showOnHome = false,
       pac = 50,
@@ -56,6 +68,9 @@ export const createPlayer = async (req: Request, res: Response) => {
       teamId,
       seasonId,
       cardImageUrl,
+      cardImageX,
+      cardImageY,
+      cardImageScale,
       galleryImages,
       showOnHome,
       pac,

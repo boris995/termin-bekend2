@@ -1,6 +1,6 @@
 import { Op } from 'sequelize';
 import { Request, Response } from 'express';
-import { CmsBlock, Match, NextMatch, Player, Season, Team } from '../models';
+import { AppSetting, CmsBlock, Match, NextMatch, Player, Season, Team } from '../models';
 import { activateDueNextMatches } from '../services/matchService';
 import { ok } from '../utils/http';
 
@@ -51,6 +51,22 @@ export const getHome = async (req: Request, res: Response) => {
   const homeFeaturedPlayers = seasonId
     ? await Player.findAll({ where: { seasonId, showOnHome: true }, include: ['team'], order: [['teamId', 'ASC'], ['shirtNumber', 'ASC']] })
     : [];
+  const [cardDesign, siteDesign] = await Promise.all([
+    AppSetting.findByPk('cardDesign'),
+    AppSetting.findByPk('siteDesign')
+  ]);
 
-  return ok(res, { season: activeSeason, teams, lastMatch, lastMatches, nextMatch, homeFeaturedPlayers, contentBlocks });
+  return ok(res, {
+    season: activeSeason,
+    teams,
+    lastMatch,
+    lastMatches,
+    nextMatch,
+    homeFeaturedPlayers,
+    contentBlocks,
+    settings: {
+      cardDesign: cardDesign?.value || 'standard',
+      siteDesign: siteDesign?.value || 'classic'
+    }
+  });
 };
