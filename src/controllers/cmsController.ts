@@ -33,34 +33,42 @@ const parseDonationPage = (value?: string | null) => {
 };
 
 export const getSettings = async (_req: Request, res: Response) => {
-  const [cardDesign, siteDesign] = await Promise.all([
+  const [cardDesign, siteDesign, showClassicHomeIntroSection] = await Promise.all([
     AppSetting.findByPk('cardDesign'),
-    AppSetting.findByPk('siteDesign')
+    AppSetting.findByPk('siteDesign'),
+    AppSetting.findByPk('showClassicHomeIntroSection')
   ]);
   return ok(res, {
     cardDesign: validCardDesigns.includes(cardDesign?.value || '') ? cardDesign?.value : 'standard',
-    siteDesign: validSiteDesigns.includes(siteDesign?.value || '') ? siteDesign?.value : 'classic'
+    siteDesign: validSiteDesigns.includes(siteDesign?.value || '') ? siteDesign?.value : 'classic',
+    showClassicHomeIntroSection: showClassicHomeIntroSection?.value === 'true'
   });
 };
 
 export const updateSettings = async (req: Request, res: Response) => {
-  const { cardDesign, siteDesign } = req.body;
+  const { cardDesign, siteDesign, showClassicHomeIntroSection } = req.body;
   if (cardDesign !== undefined && !validCardDesigns.includes(cardDesign)) return fail(res, 'Dizajn kartice mora biti standard ili gold.');
   if (siteDesign !== undefined && !validSiteDesigns.includes(siteDesign)) return fail(res, 'Dizajn sajta mora biti classic ili premium.');
-  if (cardDesign === undefined && siteDesign === undefined) return fail(res, 'Nije poslat dizajn za cuvanje.');
+  if (showClassicHomeIntroSection !== undefined && typeof showClassicHomeIntroSection !== 'boolean') return fail(res, 'Prikaz classic home sekcije mora biti da/ne vrijednost.');
+  if (cardDesign === undefined && siteDesign === undefined && showClassicHomeIntroSection === undefined) return fail(res, 'Nisu poslate postavke za cuvanje.');
 
   await Promise.all([
     cardDesign !== undefined ? AppSetting.upsert({ key: 'cardDesign', value: cardDesign }) : Promise.resolve(),
-    siteDesign !== undefined ? AppSetting.upsert({ key: 'siteDesign', value: siteDesign }) : Promise.resolve()
+    siteDesign !== undefined ? AppSetting.upsert({ key: 'siteDesign', value: siteDesign }) : Promise.resolve(),
+    showClassicHomeIntroSection !== undefined
+      ? AppSetting.upsert({ key: 'showClassicHomeIntroSection', value: showClassicHomeIntroSection ? 'true' : 'false' })
+      : Promise.resolve()
   ]);
 
-  const [savedCardDesign, savedSiteDesign] = await Promise.all([
+  const [savedCardDesign, savedSiteDesign, savedShowClassicHomeIntroSection] = await Promise.all([
     AppSetting.findByPk('cardDesign'),
-    AppSetting.findByPk('siteDesign')
+    AppSetting.findByPk('siteDesign'),
+    AppSetting.findByPk('showClassicHomeIntroSection')
   ]);
   return ok(res, {
     cardDesign: validCardDesigns.includes(savedCardDesign?.value || '') ? savedCardDesign?.value : 'standard',
-    siteDesign: validSiteDesigns.includes(savedSiteDesign?.value || '') ? savedSiteDesign?.value : 'classic'
+    siteDesign: validSiteDesigns.includes(savedSiteDesign?.value || '') ? savedSiteDesign?.value : 'classic',
+    showClassicHomeIntroSection: savedShowClassicHomeIntroSection?.value === 'true'
   });
 };
 

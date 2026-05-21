@@ -79,6 +79,11 @@ export const playerVoteSchema = z.object({
   voterKey: z.string().trim().min(12).max(80)
 });
 
+export const matchCommentSchema = z.object({
+  authorName: z.string().trim().max(60).optional().nullable(),
+  body: z.string().trim().min(1).max(255)
+});
+
 export const cmsBlockSchema = z.object({
   title: z.string().trim().min(1),
   body: z.string().trim().min(1),

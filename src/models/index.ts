@@ -1,5 +1,6 @@
 import { AppSetting } from './AppSetting';
 import { Match } from './Match';
+import { MatchComment } from './MatchComment';
 import { MatchPlayerRating } from './MatchPlayerRating';
 import { MatchPlayerVote } from './MatchPlayerVote';
 import { CmsBlock } from './CmsBlock';
@@ -60,4 +61,7 @@ MatchPlayerVote.belongsTo(Match, { foreignKey: 'matchId', as: 'match' });
 Player.hasMany(MatchPlayerVote, { foreignKey: 'playerId', as: 'playerVotes', onDelete: 'CASCADE' });
 MatchPlayerVote.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
 
-export { AppSetting, CmsBlock, Match, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, PlayerMatchStat, PlayerSeason, Season, Team, User };
+Match.hasMany(MatchComment, { foreignKey: 'matchId', as: 'comments', onDelete: 'CASCADE' });
+MatchComment.belongsTo(Match, { foreignKey: 'matchId', as: 'match' });
+
+export { AppSetting, CmsBlock, Match, MatchComment, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, PlayerMatchStat, PlayerSeason, Season, Team, User };

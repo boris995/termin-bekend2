@@ -506,6 +506,8 @@ const main = async () => {
     })
   });
 
+  await AppSetting.upsert({ key: 'showClassicHomeIntroSection', value: 'false' });
+
   console.log('Seed zavrsen. Login: admin@football.com / admin123');
   await sequelize.close();
 };

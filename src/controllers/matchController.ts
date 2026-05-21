@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
-import { Match } from '../models';
+import { Match, MatchComment } from '../models';
 import { createMatch, deleteMatch, getMatchVotingSummary, rateMatchPlayer, updateMatch, voteMatchPlayer } from '../services/matchService';
 import { fail, ok } from '../utils/http';
 
 const matchInclude = ['homeTeam', 'awayTeam', 'winnerTeam', { association: 'playerStats', include: ['player', 'team'] }];
+const matchDetailInclude = [...matchInclude, { association: 'comments' }];
 
 export const getSeasonMatches = async (req: Request, res: Response) => {
   const matches = await Match.findAll({ where: { seasonId: req.params.seasonId }, include: matchInclude, order: [['matchNumber', 'DESC']] });
@@ -11,10 +12,21 @@ export const getSeasonMatches = async (req: Request, res: Response) => {
 };
 
 export const getMatch = async (req: Request, res: Response) => {
-  const match = await Match.findByPk(Number(req.params.id), { include: matchInclude });
+  const match = await Match.findByPk(Number(req.params.id), { include: matchDetailInclude, order: [[{ model: MatchComment, as: 'comments' }, 'createdAt', 'DESC']] });
   if (!match) return fail(res, 'Utakmica nije pronadjena.', 404);
   const voting = await getMatchVotingSummary(match.id);
   return ok(res, { ...match.toJSON(), ...voting });
+};
+
+export const postMatchComment = async (req: Request, res: Response) => {
+  const match = await Match.findByPk(Number(req.params.id));
+  if (!match) return fail(res, 'Utakmica nije pronadjena.', 404);
+  const comment = await MatchComment.create({
+    matchId: match.id,
+    authorName: req.body.authorName || null,
+    body: req.body.body
+  });
+  return ok(res, comment, 201);
 };
 
 export const postMatch = async (req: Request, res: Response) => {

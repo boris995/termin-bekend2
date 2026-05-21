@@ -77,9 +77,10 @@ export const getHome = async (req: Request, res: Response) => {
     audienceRating: audienceRatings[link.player!.id]?.average || null,
     audienceRatingCount: audienceRatings[link.player!.id]?.count || 0
   }));
-  const [cardDesign, siteDesign] = await Promise.all([
+  const [cardDesign, siteDesign, showClassicHomeIntroSection] = await Promise.all([
     AppSetting.findByPk('cardDesign'),
-    AppSetting.findByPk('siteDesign')
+    AppSetting.findByPk('siteDesign'),
+    AppSetting.findByPk('showClassicHomeIntroSection')
   ]);
 
   return ok(res, {
@@ -92,7 +93,8 @@ export const getHome = async (req: Request, res: Response) => {
     contentBlocks,
     settings: {
       cardDesign: cardDesign?.value || 'standard',
-      siteDesign: siteDesign?.value || 'classic'
+      siteDesign: siteDesign?.value || 'classic',
+      showClassicHomeIntroSection: showClassicHomeIntroSection?.value === 'true'
     }
   });
 };
