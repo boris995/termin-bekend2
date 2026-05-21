@@ -1,5 +1,5 @@
 import { Op, Transaction } from 'sequelize';
-import { Player, PlayerMatchStat } from '../models';
+import { Player, PlayerMatchStat, PlayerSeason } from '../models';
 
 export const recalculatePlayers = async (playerIds: number[], transaction?: Transaction) => {
   const uniqueIds = [...new Set(playerIds)].filter(Boolean);
@@ -22,8 +22,8 @@ export const getPlayersFromMatch = async (matchId: number, transaction?: Transac
 };
 
 export const recalculateAllSeasonPlayers = async (seasonId: number, transaction?: Transaction) => {
-  const players = await Player.findAll({ where: { seasonId }, attributes: ['id'], transaction });
-  await recalculatePlayers(players.map((player) => player.id), transaction);
+  const links = await PlayerSeason.findAll({ where: { seasonId }, attributes: ['playerId'], transaction });
+  await recalculatePlayers(links.map((link) => link.playerId), transaction);
 };
 
 export const deleteStatsForMatch = async (matchId: number, transaction?: Transaction) => {
@@ -31,6 +31,6 @@ export const deleteStatsForMatch = async (matchId: number, transaction?: Transac
 };
 
 export const validatePlayersBelongToSeason = async (seasonId: number, playerIds: number[]) => {
-  const count = await Player.count({ where: { id: { [Op.in]: playerIds }, seasonId } });
+  const count = await PlayerSeason.count({ where: { playerId: { [Op.in]: playerIds }, seasonId } });
   return count === [...new Set(playerIds)].length;
 };

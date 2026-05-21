@@ -1,8 +1,20 @@
 import { Op } from 'sequelize';
 import { Request, Response } from 'express';
-import { AppSetting, CmsBlock, Match, NextMatch, Player, Season, Team } from '../models';
+import { AppSetting, CmsBlock, Match, MatchPlayerRating, NextMatch, Player, PlayerSeason, Season, Team } from '../models';
 import { activateDueNextMatches } from '../services/matchService';
 import { ok } from '../utils/http';
+
+const audienceRatingsFor = async (playerIds: number[]) => {
+  const ratings = await MatchPlayerRating.findAll({ where: { playerId: playerIds } });
+  return ratings.reduce<Record<number, { count: number; total: number; average: number }>>((acc, item) => {
+    const current = acc[item.playerId] || { count: 0, total: 0, average: 0 };
+    current.count += 1;
+    current.total += item.rating;
+    current.average = Number((current.total / current.count).toFixed(1));
+    acc[item.playerId] = current;
+    return acc;
+  }, {});
+};
 
 export const getHome = async (req: Request, res: Response) => {
   await activateDueNextMatches();
@@ -48,9 +60,23 @@ export const getHome = async (req: Request, res: Response) => {
   });
 
   const teams = seasonId ? await Team.findAll({ where: { seasonId }, order: [['id', 'ASC']] }) : [];
-  const homeFeaturedPlayers = seasonId
-    ? await Player.findAll({ where: { seasonId, showOnHome: true }, include: ['team'], order: [['teamId', 'ASC'], ['shirtNumber', 'ASC']] })
+  const homeFeaturedLinks = seasonId
+    ? await PlayerSeason.findAll({
+        where: { seasonId, showOnHome: true },
+        include: ['player', 'team'],
+        order: [['teamId', 'ASC'], [{ model: Player, as: 'player' }, 'shirtNumber', 'ASC']]
+      })
     : [];
+  const audienceRatings = await audienceRatingsFor(homeFeaturedLinks.map((link) => link.player!.id));
+  const homeFeaturedPlayers = homeFeaturedLinks.map((link) => ({
+    ...link.player!.toJSON(),
+    seasonId: link.seasonId,
+    teamId: link.teamId,
+    team: link.team,
+    showOnHome: link.showOnHome,
+    audienceRating: audienceRatings[link.player!.id]?.average || null,
+    audienceRatingCount: audienceRatings[link.player!.id]?.count || 0
+  }));
   const [cardDesign, siteDesign] = await Promise.all([
     AppSetting.findByPk('cardDesign'),
     AppSetting.findByPk('siteDesign')

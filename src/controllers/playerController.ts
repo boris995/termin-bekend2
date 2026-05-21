@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Player, PlayerMatchStat, Team } from '../models';
+import { MatchPlayerRating, Player, PlayerMatchStat, PlayerSeason, Team } from '../models';
 import { fail, ok } from '../utils/http';
 
 const ratingKeys = ['pac', 'sho', 'pas', 'dri', 'def', 'phy'] as const;
@@ -7,14 +7,49 @@ const ratingKeys = ['pac', 'sho', 'pas', 'dri', 'def', 'phy'] as const;
 const calculateOverall = (ratings: Record<(typeof ratingKeys)[number], number>) =>
   Math.round(ratingKeys.reduce((sum, key) => sum + Number(ratings[key]), 0) / ratingKeys.length);
 
+const audienceRatingsFor = async (playerIds: number[]) => {
+  const ratings = await MatchPlayerRating.findAll({ where: { playerId: playerIds } });
+  return ratings.reduce<Record<number, { count: number; total: number; average: number }>>((acc, item) => {
+    const current = acc[item.playerId] || { count: 0, total: 0, average: 0 };
+    current.count += 1;
+    current.total += item.rating;
+    current.average = Number((current.total / current.count).toFixed(1));
+    acc[item.playerId] = current;
+    return acc;
+  }, {});
+};
+
+const playerJson = (
+  link: PlayerSeason,
+  audienceRatings: Record<number, { count: number; total: number; average: number }>
+) => ({
+  ...link.player!.toJSON(),
+  seasonId: link.seasonId,
+  teamId: link.teamId,
+  team: link.team,
+  showOnHome: link.showOnHome,
+  audienceRating: audienceRatings[link.player!.id]?.average || null,
+  audienceRatingCount: audienceRatings[link.player!.id]?.count || 0
+});
+
 export const getSeasonPlayers = async (req: Request, res: Response) => {
-  const players = await Player.findAll({ where: { seasonId: req.params.seasonId }, include: ['team'], order: [['teamId', 'ASC'], ['shirtNumber', 'ASC']] });
-  return ok(res, players);
+  const links = await PlayerSeason.findAll({
+    where: { seasonId: req.params.seasonId },
+    include: ['player', 'team'],
+    order: [['teamId', 'ASC'], [{ model: Player, as: 'player' }, 'shirtNumber', 'ASC']]
+  });
+  const audienceRatings = await audienceRatingsFor(links.map((link) => link.player!.id));
+  return ok(res, links.map((link) => playerJson(link, audienceRatings)));
 };
 
 export const getTeamPlayers = async (req: Request, res: Response) => {
-  const players = await Player.findAll({ where: { teamId: req.params.teamId }, include: ['team'], order: [['shirtNumber', 'ASC']] });
-  return ok(res, players);
+  const links = await PlayerSeason.findAll({
+    where: { teamId: req.params.teamId },
+    include: ['player', 'team'],
+    order: [[{ model: Player, as: 'player' }, 'shirtNumber', 'ASC']]
+  });
+  const audienceRatings = await audienceRatingsFor(links.map((link) => link.player!.id));
+  return ok(res, links.map((link) => playerJson(link, audienceRatings)));
 };
 
 export const getPlayer = async (req: Request, res: Response) => {
@@ -29,7 +64,13 @@ export const getPlayer = async (req: Request, res: Response) => {
     order: [['id', 'DESC']],
     limit: 8
   });
-  return ok(res, { ...player.toJSON(), matchStats });
+  const audienceRatings = await audienceRatingsFor([player.id]);
+  return ok(res, {
+    ...player.toJSON(),
+    audienceRating: audienceRatings[player.id]?.average || null,
+    audienceRatingCount: audienceRatings[player.id]?.count || 0,
+    matchStats
+  });
 };
 
 export const createPlayer = async (req: Request, res: Response) => {
@@ -81,6 +122,7 @@ export const createPlayer = async (req: Request, res: Response) => {
       phy,
       overallRating
     });
+    await PlayerSeason.create({ playerId: player.id, seasonId, teamId, showOnHome });
     return ok(res, player, 201);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Igrac nije kreiran.');
@@ -104,6 +146,9 @@ export const updatePlayer = async (req: Request, res: Response) => {
   }
 
   await player.update(next);
+  if (next.seasonId && next.teamId) {
+    await PlayerSeason.upsert({ playerId: player.id, seasonId: Number(next.seasonId), teamId: Number(next.teamId), showOnHome: next.showOnHome ?? player.showOnHome });
+  }
   return ok(res, player);
 };
 

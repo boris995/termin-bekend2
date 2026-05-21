@@ -6,6 +6,7 @@ import { CmsBlock } from './CmsBlock';
 import { NextMatch } from './NextMatch';
 import { Player } from './Player';
 import { PlayerMatchStat } from './PlayerMatchStat';
+import { PlayerSeason } from './PlayerSeason';
 import { Season } from './Season';
 import { Team } from './Team';
 import { User } from './User';
@@ -18,6 +19,13 @@ Player.belongsTo(Season, { foreignKey: 'seasonId', as: 'season' });
 
 Team.hasMany(Player, { foreignKey: 'teamId', as: 'players', onDelete: 'CASCADE' });
 Player.belongsTo(Team, { foreignKey: 'teamId', as: 'team' });
+
+Season.hasMany(PlayerSeason, { foreignKey: 'seasonId', as: 'playerSeasons', onDelete: 'CASCADE' });
+PlayerSeason.belongsTo(Season, { foreignKey: 'seasonId', as: 'season' });
+Team.hasMany(PlayerSeason, { foreignKey: 'teamId', as: 'playerSeasons', onDelete: 'CASCADE' });
+PlayerSeason.belongsTo(Team, { foreignKey: 'teamId', as: 'team' });
+Player.hasMany(PlayerSeason, { foreignKey: 'playerId', as: 'seasonLinks', onDelete: 'CASCADE' });
+PlayerSeason.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
 
 Season.hasMany(Match, { foreignKey: 'seasonId', as: 'matches', onDelete: 'CASCADE' });
 Match.belongsTo(Season, { foreignKey: 'seasonId', as: 'season' });
@@ -52,4 +60,4 @@ MatchPlayerVote.belongsTo(Match, { foreignKey: 'matchId', as: 'match' });
 Player.hasMany(MatchPlayerVote, { foreignKey: 'playerId', as: 'playerVotes', onDelete: 'CASCADE' });
 MatchPlayerVote.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
 
-export { AppSetting, CmsBlock, Match, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, PlayerMatchStat, Season, Team, User };
+export { AppSetting, CmsBlock, Match, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, PlayerMatchStat, PlayerSeason, Season, Team, User };

@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { sequelize } from '../config/database';
 import { createMatch } from '../services/matchService';
-import { AppSetting, CmsBlock, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, Season, Team, User } from '../models';
+import { AppSetting, CmsBlock, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, PlayerSeason, Season, Team, User } from '../models';
 
 const avg = (ratings: { pac: number; sho: number; pas: number; dri: number; def: number; phy: number }) =>
   Math.round((ratings.pac + ratings.sho + ratings.pas + ratings.dri + ratings.def + ratings.phy) / 6);
@@ -15,21 +15,86 @@ const imagesFor = (slug: string) => ({
   ]
 });
 
-const playerSeeds = [
-  ['Boris', 'Djukusic', 'Boki', 'golman-igrac', 1, 'white', 78, 74, 81, 79, 72, 84],
-  ['Obrad', 'Pejic', null, 'igrac', 7, 'white', 82, 77, 70, 76, 58, 73],
-  ['Vladimir', 'Peric', 'Vlado', 'igrac', 10, 'white', 75, 80, 84, 83, 61, 70],
-  ['Marko', 'Jovanovic', 'Maki', 'igrac', 11, 'white', 88, 79, 76, 87, 52, 74],
-  ['Stefan', 'Nikolic', null, 'igrac', 5, 'white', 71, 69, 78, 73, 74, 80],
-  ['Luka', 'Stojanovic', 'Luks', 'igrac', 8, 'white', 77, 72, 82, 80, 63, 72],
-  ['Milos', 'Radovic', null, 'golman', 13, 'white', 58, 44, 63, 61, 84, 83],
-  ['Nedeljko', 'Babic', null, 'golman', 12, 'black', 61, 48, 66, 63, 85, 81],
-  ['David', 'Lejic', 'Daki', 'igrac', 9, 'black', 86, 82, 73, 85, 55, 76],
-  ['Aleksa', 'Kovacevic', 'Aki', 'igrac', 6, 'black', 79, 70, 80, 78, 68, 77],
-  ['Petar', 'Savic', null, 'igrac', 3, 'black', 73, 66, 74, 70, 81, 82],
-  ['Filip', 'Matic', 'Fico', 'igrac', 14, 'black', 84, 75, 71, 82, 56, 75],
-  ['Nemanja', 'Ilic', null, 'golman-igrac', 2, 'black', 70, 62, 76, 72, 79, 86]
-] as const;
+type SeasonKey = 'season1' | 'season2';
+type TeamKey = 'white' | 'black';
+type PlayerSeed = {
+  firstName: string;
+  lastName: string;
+  nickname: string | null;
+  position: 'golman' | 'igrac' | 'golman-igrac';
+  shirtNumber: number;
+  team: TeamKey;
+  seasons: SeasonKey[];
+  pac: number;
+  sho: number;
+  pas: number;
+  dri: number;
+  def: number;
+  phy: number;
+};
+type SeasonTeamMap = Record<TeamKey, Team>;
+type SeededPlayer = { player: Player; seed: PlayerSeed };
+
+const playerSeeds: PlayerSeed[] = [
+  { firstName: 'Boris', lastName: 'Djukuic', nickname: 'Boki', position: 'golman', shirtNumber: 1, team: 'white', seasons: ['season1', 'season2'], pac: 72, sho: 65, pas: 60, dri: 58, def: 84, phy: 82 },
+  { firstName: 'Stefan', lastName: 'Jeftic', nickname: null, position: 'igrac', shirtNumber: 5, team: 'white', seasons: ['season1', 'season2'], pac: 80, sho: 78, pas: 76, dri: 82, def: 68, phy: 75 },
+  { firstName: 'Zeljko', lastName: 'Maksimovic', nickname: null, position: 'igrac', shirtNumber: 7, team: 'white', seasons: ['season1', 'season2'], pac: 78, sho: 74, pas: 79, dri: 81, def: 70, phy: 76 },
+  { firstName: 'Bojan', lastName: 'Andzic', nickname: null, position: 'igrac', shirtNumber: 8, team: 'white', seasons: ['season1', 'season2'], pac: 76, sho: 72, pas: 74, dri: 77, def: 69, phy: 74 },
+  { firstName: 'Nedeljko', lastName: 'Babic', nickname: null, position: 'golman-igrac', shirtNumber: 12, team: 'white', seasons: ['season1', 'season2'], pac: 64, sho: 58, pas: 62, dri: 60, def: 82, phy: 84 },
+  { firstName: 'Milorad', lastName: 'Tomic', nickname: null, position: 'igrac', shirtNumber: 11, team: 'white', seasons: ['season1', 'season2'], pac: 74, sho: 70, pas: 75, dri: 73, def: 72, phy: 78 },
+  { firstName: 'David', lastName: 'Lejic', nickname: 'Daki', position: 'igrac', shirtNumber: 9, team: 'white', seasons: ['season1', 'season2'], pac: 83, sho: 80, pas: 72, dri: 84, def: 60, phy: 77 },
+  { firstName: 'Vladimir', lastName: 'Peric', nickname: 'Vlado', position: 'igrac', shirtNumber: 10, team: 'black', seasons: ['season1', 'season2'], pac: 75, sho: 80, pas: 84, dri: 83, def: 61, phy: 70 },
+  { firstName: 'Djordje', lastName: 'Koprivica', nickname: null, position: 'igrac', shirtNumber: 6, team: 'black', seasons: ['season1', 'season2'], pac: 79, sho: 75, pas: 78, dri: 76, def: 66, phy: 74 },
+  { firstName: 'Obrad', lastName: 'Pejic', nickname: null, position: 'igrac', shirtNumber: 4, team: 'black', seasons: ['season1', 'season2'], pac: 82, sho: 77, pas: 70, dri: 76, def: 58, phy: 73 },
+  { firstName: 'Petar', lastName: 'Jovanovic', nickname: null, position: 'igrac', shirtNumber: 3, team: 'black', seasons: ['season1', 'season2'], pac: 73, sho: 66, pas: 74, dri: 70, def: 81, phy: 82 },
+  { firstName: 'Bogoljub', lastName: 'Sando', nickname: null, position: 'golman-igrac', shirtNumber: 2, team: 'black', seasons: ['season1', 'season2'], pac: 68, sho: 62, pas: 74, dri: 71, def: 78, phy: 80 },
+  { firstName: 'Srboljub', lastName: 'Petrovic', nickname: null, position: 'golman', shirtNumber: 13, team: 'black', seasons: ['season1', 'season2'], pac: 62, sho: 50, pas: 68, dri: 65, def: 84, phy: 82 },
+  { firstName: 'Florian', lastName: 'Wirtz', nickname: 'Wirtz', position: 'igrac', shirtNumber: 17, team: 'white', seasons: ['season1'], pac: 86, sho: 82, pas: 88, dri: 89, def: 62, phy: 74 },
+  { firstName: 'Bukayo', lastName: 'Saka', nickname: 'Saka', position: 'igrac', shirtNumber: 19, team: 'black', seasons: ['season1'], pac: 88, sho: 83, pas: 84, dri: 90, def: 66, phy: 78 }
+];
+
+const ratingsFromSeed = ({ pac, sho, pas, dri, def, phy }: PlayerSeed) => ({ pac, sho, pas, dri, def, phy });
+
+const createSeedPlayer = (seed: PlayerSeed, teams: SeasonTeamMap, primarySeasonId: number) => {
+  const slug = `${seed.firstName}-${seed.lastName}`.toLowerCase();
+  const ratings = ratingsFromSeed(seed);
+
+  return Player.create({
+    firstName: seed.firstName,
+    lastName: seed.lastName,
+    nickname: seed.nickname,
+    position: seed.position,
+    shirtNumber: seed.shirtNumber,
+    ...imagesFor(slug),
+    ...ratings,
+    overallRating: avg(ratings),
+    teamId: teams[seed.team].id,
+    seasonId: primarySeasonId
+  });
+};
+
+const playersForSeason = (seededPlayers: SeededPlayer[], seasonKey: SeasonKey, team: TeamKey) =>
+  seededPlayers
+    .filter(({ seed }) => seed.team === team && seed.seasons.includes(seasonKey))
+    .map(({ player }) => player);
+
+const linkPlayersToSeason = (seasonId: number, teams: SeasonTeamMap, seededPlayers: SeededPlayer[], seasonKey: SeasonKey) => {
+  const homeCounters: Record<TeamKey, number> = { white: 0, black: 0 };
+
+  return PlayerSeason.bulkCreate(
+    seededPlayers
+      .filter(({ seed }) => seed.seasons.includes(seasonKey))
+      .map(({ player, seed }) => {
+        const index = homeCounters[seed.team]++;
+        return {
+          playerId: player.id,
+          seasonId,
+          teamId: teams[seed.team].id,
+          showOnHome: index < 4
+        };
+      })
+  );
+};
 
 const main = async () => {
   const force = process.env.SEED_FORCE === 'true';
@@ -52,7 +117,7 @@ const main = async () => {
     name: 'Bijeli',
     shortName: 'BIJ',
     logoUrl: '/player-assets/player-card.svg?team=bijeli',
-    representativeName: 'Boris Djukusic',
+    representativeName: 'Boris Djukuic',
     primaryColor: '#F8FAFC',
     seasonId: season.id
   });
@@ -65,27 +130,13 @@ const main = async () => {
     seasonId: season.id
   });
 
-  const players = await Promise.all(
-    playerSeeds.map(([firstName, lastName, nickname, position, shirtNumber, team, pac, sho, pas, dri, def, phy]) => {
-      const slug = `${firstName}-${lastName}`.toLowerCase();
-      const ratings = { pac, sho, pas, dri, def, phy };
-      return Player.create({
-        firstName,
-        lastName,
-        nickname,
-        position,
-        shirtNumber,
-        ...imagesFor(slug),
-        ...ratings,
-        overallRating: avg(ratings),
-        teamId: team === 'white' ? white.id : black.id,
-        seasonId: season.id
-      });
-    })
+  const seasonOneTeams = { white, black };
+  const seededPlayers = await Promise.all(
+    playerSeeds.map(async (seed) => ({ seed, player: await createSeedPlayer(seed, seasonOneTeams, season.id) }))
   );
-
-  const whitePlayers = players.filter((player) => player.teamId === white.id);
-  const blackPlayers = players.filter((player) => player.teamId === black.id);
+  const seasonOneWhitePlayers = playersForSeason(seededPlayers, 'season1', 'white');
+  const seasonOneBlackPlayers = playersForSeason(seededPlayers, 'season1', 'black');
+  await linkPlayersToSeason(season.id, seasonOneTeams, seededPlayers, 'season1');
   const fixtures = [
     { homeScore: 6, awayScore: 3, whiteHome: true, daysAgo: 36 },
     { homeScore: 5, awayScore: 7, whiteHome: false, daysAgo: 34 },
@@ -111,8 +162,8 @@ const main = async () => {
   for (const fixture of fixtures) {
     const home = fixture.whiteHome ? white : black;
     const away = fixture.whiteHome ? black : white;
-    const homePlayers = fixture.whiteHome ? whitePlayers : blackPlayers;
-    const awayPlayers = fixture.whiteHome ? blackPlayers : whitePlayers;
+    const homePlayers = fixture.whiteHome ? seasonOneWhitePlayers : seasonOneBlackPlayers;
+    const awayPlayers = fixture.whiteHome ? seasonOneBlackPlayers : seasonOneWhitePlayers;
     const playedAt = new Date(Date.now() - fixture.daysAgo * 24 * 60 * 60 * 1000);
 
     const match = await createMatch({
@@ -143,23 +194,23 @@ const main = async () => {
   }
 
   await MatchPlayerVote.bulkCreate([
-    { matchId: latestMatchId, playerId: whitePlayers[0].id, voterKey: 'seed-voter-0001' },
-    { matchId: latestMatchId, playerId: whitePlayers[3].id, voterKey: 'seed-voter-0002' },
-    { matchId: latestMatchId, playerId: blackPlayers[1].id, voterKey: 'seed-voter-0003' }
+    { matchId: latestMatchId, playerId: seasonOneWhitePlayers[0].id, voterKey: 'seed-voter-0001' },
+    { matchId: latestMatchId, playerId: seasonOneWhitePlayers[3].id, voterKey: 'seed-voter-0002' },
+    { matchId: latestMatchId, playerId: seasonOneBlackPlayers[1].id, voterKey: 'seed-voter-0003' }
   ]);
 
   await MatchPlayerRating.bulkCreate([
-    { matchId: latestMatchId, playerId: whitePlayers[0].id, voterKey: 'seed-rating-0001', rating: 9 },
-    { matchId: latestMatchId, playerId: whitePlayers[3].id, voterKey: 'seed-rating-0002', rating: 8 },
-    { matchId: latestMatchId, playerId: blackPlayers[1].id, voterKey: 'seed-rating-0003', rating: 7 },
-    { matchId: latestMatchId, playerId: blackPlayers[0].id, voterKey: 'seed-rating-0004', rating: 8 }
+    { matchId: latestMatchId, playerId: seasonOneWhitePlayers[0].id, voterKey: 'seed-rating-0001', rating: 9 },
+    { matchId: latestMatchId, playerId: seasonOneWhitePlayers[3].id, voterKey: 'seed-rating-0002', rating: 8 },
+    { matchId: latestMatchId, playerId: seasonOneBlackPlayers[1].id, voterKey: 'seed-rating-0003', rating: 7 },
+    { matchId: latestMatchId, playerId: seasonOneBlackPlayers[0].id, voterKey: 'seed-rating-0004', rating: 8 }
   ]);
 
   const seasonTwoStart = new Date(2026, 4, 21, 17, 0, 0);
   const seasonTwo = await Season.create({
     number: 2,
     name: 'Sezona 2: Crni vs Beli',
-    winsToWinSeason: 13,
+    winsToWinSeason: 8,
     startedAt: seasonTwoStart
   });
   const seasonTwoBlack = await Team.create({
@@ -179,49 +230,7 @@ const main = async () => {
     seasonId: seasonTwo.id
   });
 
-  const seasonTwoPlayers = [
-    ['Petar', 'Perovic', 'Pero', 'igrac', 4, seasonTwoBlack.id, 77, 76, 72, 78, 66, 78],
-    ['Nikola', 'Koprivica', 'Kopra', 'golman-igrac', 1, seasonTwoBlack.id, 72, 67, 79, 74, 80, 84],
-    ['Obrad', 'Pejic', 'Obrad', 'igrac', 7, seasonTwoBlack.id, 82, 77, 70, 76, 58, 73],
-    ['Vladimir', 'Peric', 'Vladimir', 'igrac', 10, seasonTwoBlack.id, 75, 80, 84, 83, 61, 70],
-    ['Aleksandar', 'Sandic', 'Sando', 'igrac', 8, seasonTwoBlack.id, 80, 74, 78, 81, 64, 76],
-    ['Srdjan', 'Srbovic', 'Srbo', 'golman', 12, seasonTwoBlack.id, 60, 45, 65, 62, 86, 83],
-    ['Slobodan', 'Jovanovic', 'Sone', 'igrac', 11, seasonTwoWhite.id, 84, 79, 77, 85, 57, 75],
-    ['Milan', 'Murinjo', 'Murinjo', 'golman-igrac', 2, seasonTwoWhite.id, 71, 65, 82, 73, 79, 86],
-    ['Bojan', 'Radovic', 'Bojan', 'igrac', 6, seasonTwoWhite.id, 78, 76, 80, 79, 68, 77],
-    ['Mihailo', 'Mickovic', 'Micko', 'igrac', 5, seasonTwoWhite.id, 74, 70, 76, 72, 81, 80],
-    ['Maksim', 'Maksimovic', 'Makso', 'igrac', 9, seasonTwoWhite.id, 86, 82, 73, 84, 55, 77],
-    ['David', 'Lejic', 'Dejvid', 'igrac', 14, seasonTwoWhite.id, 86, 82, 73, 85, 55, 76]
-  ] as const;
-
-  const seasonTwoCreatedPlayers = await Promise.all(
-    seasonTwoPlayers.map(([firstName, lastName, nickname, position, shirtNumber, teamId, pac, sho, pas, dri, def, phy]) => {
-      const ratings = { pac, sho, pas, dri, def, phy };
-      return Player.create({
-        firstName,
-        lastName,
-        nickname,
-        position,
-        shirtNumber,
-        ...imagesFor(`s2-${nickname}`.toLowerCase()),
-        ...ratings,
-        overallRating: avg(ratings),
-        showOnHome: false,
-        teamId,
-        seasonId: seasonTwo.id
-      });
-    })
-  );
-
-  await Promise.all(
-    seasonTwoCreatedPlayers
-      .filter((player) => player.teamId === seasonTwoBlack.id || player.teamId === seasonTwoWhite.id)
-      .reduce<Player[]>((selected, player) => {
-        const sameTeamCount = selected.filter((item) => item.teamId === player.teamId).length;
-        return sameTeamCount < 4 ? [...selected, player] : selected;
-      }, [])
-      .map((player) => player.update({ showOnHome: true }))
-  );
+  await linkPlayersToSeason(seasonTwo.id, { white: seasonTwoWhite, black: seasonTwoBlack }, seededPlayers, 'season2');
 
   await NextMatch.create({
     seasonId: seasonTwo.id,
@@ -231,6 +240,112 @@ const main = async () => {
     venue: 'City Arena',
     note: 'Prva utakmica Sezone 2. Crni: Pero, Kopra, Obrad, Vladimir, Sando i Srbo. Beli: Sone, Murinjo, Bojan, Micko, Makso i Dejvid.'
   });
+
+  // --- Provjerna sezona: MURINjO vs LALAT (LALAT wins series 13-5) ---
+  const provSeason = await Season.create({ number: 5, name: 'Provjerna Sezona: MURINjO vs LALAT', winsToWinSeason: 99, startedAt: new Date() });
+  const murinjo = await Team.create({
+    name: 'MURINjO',
+    shortName: 'MUR',
+    logoUrl: '/player-assets/player-card.svg?team=murinjo',
+    representativeName: 'Murinjo',
+    primaryColor: '#1f2937',
+    seasonId: provSeason.id
+  });
+  const lalat = await Team.create({
+    name: 'LALAT',
+    shortName: 'LAL',
+    logoUrl: '/player-assets/player-card.svg?team=lalat',
+    representativeName: 'Lalat',
+    primaryColor: '#ef4444',
+    seasonId: provSeason.id
+  });
+
+  const provPlayersData = [
+    // MURINjO roster (8)
+    ['Mark', 'Murin', 'Murk', 'igrac', 4, 'mur', 78, 72, 75, 76, 65, 74],
+    ['Ivan', 'Murinovic', 'IvM', 'igrac', 5, 'mur', 74, 70, 73, 72, 68, 72],
+    ['Goran', 'Murinic', 'Gogo', 'igrac', 6, 'mur', 71, 68, 70, 69, 66, 70],
+    ['Stefan', 'M', 'Stef', 'golman', 1, 'mur', 60, 48, 66, 62, 86, 82],
+    ['Dario', 'Mur', null, 'igrac', 7, 'mur', 76, 69, 74, 75, 64, 71],
+    ['Milos', 'Mik', null, 'igrac', 8, 'mur', 73, 67, 72, 70, 69, 73],
+    ['Petar', 'M', null, 'igrac', 9, 'mur', 75, 71, 70, 74, 67, 74],
+    ['Nik', 'Mur', null, 'golman-igrac', 2, 'mur', 69, 63, 75, 70, 78, 80],
+    // LALAT roster (8)
+    ['Luka', 'Lalat', 'Luks', 'igrac', 10, 'lal', 84, 80, 79, 82, 60, 78],
+    ['Milan', 'L', 'Mila', 'igrac', 11, 'lal', 82, 78, 76, 80, 62, 77],
+    ['Nikola', 'L', null, 'igrac', 12, 'lal', 80, 75, 78, 79, 65, 76],
+    ['Marko', 'L', null, 'golman', 1, 'lal', 63, 50, 67, 65, 83, 81],
+    ['David', 'L', 'Davo', 'igrac', 13, 'lal', 85, 82, 74, 83, 58, 79],
+    ['Aleks', 'L', null, 'igrac', 14, 'lal', 79, 74, 77, 78, 66, 75],
+    ['Boris', 'L', null, 'igrac', 15, 'lal', 77, 73, 75, 76, 68, 74],
+    ['Nemanja', 'L', null, 'golman-igrac', 2, 'lal', 72, 65, 76, 71, 79, 84]
+  ] as const;
+
+  const provCreated = await Promise.all(
+    provPlayersData.map(([firstName, lastName, nickname, position, shirtNumber, teamKey, pac, sho, pas, dri, def, phy]) => {
+      const ratings = { pac, sho, pas, dri, def, phy } as any;
+      const teamId = (teamKey === 'mur' ? murinjo.id : lalat.id) as number;
+      return Player.create({
+        firstName,
+        lastName,
+        nickname,
+        position,
+        shirtNumber,
+        ...imagesFor(`prov-${firstName}-${lastName}`.toLowerCase()),
+        ...ratings,
+        overallRating: avg(ratings),
+        teamId,
+        seasonId: provSeason.id
+      });
+    })
+  );
+
+  const murPlayers = provCreated.filter((p) => p.teamId === murinjo.id);
+  const lalPlayers = provCreated.filter((p) => p.teamId === lalat.id);
+  await PlayerSeason.bulkCreate([
+    ...murPlayers.map((player) => ({ playerId: player.id, seasonId: provSeason.id, teamId: murinjo.id })),
+    ...lalPlayers.map((player) => ({ playerId: player.id, seasonId: provSeason.id, teamId: lalat.id }))
+  ]);
+
+  // Create 18 fixtures where LALAT wins 13 and MURINjO wins 5
+  const provFixtures: Array<{ winner: 'lal' | 'mur'; daysAgo: number; homeIsLal?: boolean } > = [];
+  // build array with 13 'lal' and 5 'mur'
+  const winners = [...Array(13).fill('lal'), ...Array(5).fill('mur')];
+  for (let i = 0; i < winners.length; i++) {
+    provFixtures.push({ winner: winners[i] as 'lal' | 'mur', daysAgo: 4 + i * 2, homeIsLal: i % 2 === 0 });
+  }
+
+  for (const fixture of provFixtures) {
+    const home = fixture.homeIsLal ? lalat : murinjo;
+    const away = fixture.homeIsLal ? murinjo : lalat;
+    const winnerIsLal = fixture.winner === 'lal';
+    const homeScore = winnerIsLal === fixture.homeIsLal ? 3 : 1;
+    const awayScore = winnerIsLal === fixture.homeIsLal ? 1 : 3;
+    const playedAt = new Date(Date.now() - fixture.daysAgo * 24 * 60 * 60 * 1000);
+
+    const match = await createMatch({
+      seasonId: provSeason.id,
+      homeTeamId: home.id,
+      awayTeamId: away.id,
+      homeScore,
+      awayScore,
+      startedAt: new Date(playedAt.getTime() - 60 * 60 * 1000),
+      endedAt: playedAt,
+      playedAt,
+      playerStats: [
+        { playerId: (home.id === murinjo.id ? murPlayers[0].id : lalPlayers[0].id), teamId: home.id, goals: Math.max(0, homeScore - 1), assists: 1 },
+        { playerId: (away.id === murinjo.id ? murPlayers[1].id : lalPlayers[1].id), teamId: away.id, goals: Math.max(0, awayScore - 1), assists: 0 }
+      ]
+    });
+
+    // Add some votes/ratings for the match
+    if (match) {
+      await MatchPlayerVote.create({ matchId: match.id, playerId: (winnerIsLal ? lalPlayers[0].id : murPlayers[0].id), voterKey: `prov-vote-${match.id}` });
+      await MatchPlayerRating.create({ matchId: match.id, playerId: (winnerIsLal ? lalPlayers[0].id : murPlayers[0].id), voterKey: `prov-rate-${match.id}`, rating: 8 + (match.id % 3) });
+    }
+  }
+
+  await provSeason.update({ winsToWinSeason: 13, status: 'completed', winnerTeamId: lalat.id, finishedAt: new Date() });
 
   const createArchiveSeason = async (
     config: {
@@ -283,6 +398,9 @@ const main = async () => {
           seasonId: archiveSeason.id
         });
       })
+    );
+    await PlayerSeason.bulkCreate(
+      archivePlayers.map((player) => ({ playerId: player.id, seasonId: archiveSeason.id, teamId: player.teamId }))
     );
 
     for (const fixture of config.fixtures) {
