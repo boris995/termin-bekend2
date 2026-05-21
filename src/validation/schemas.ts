@@ -101,3 +101,20 @@ export const nextMatchSchema = z.object({
 });
 
 export const nextMatchUpdateSchema = nextMatchSchema.partial();
+
+export const donationPageSchema = z.object({
+  eyebrow: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  intro: z.string().trim().min(1),
+  impactTitle: z.string().trim().min(1),
+  impactBody: z.string().trim().min(1),
+  paymentTitle: z.string().trim().min(1),
+  paymentBody: z.string().trim().min(1),
+  bankAccount: optionalString,
+  recipientName: optionalString,
+  paymentPurpose: optionalString,
+  ctaLabel: optionalString,
+  ctaUrl: optionalString,
+  imageUrl: optionalString,
+  isPublished: z.coerce.boolean().default(true)
+});

@@ -6,6 +6,32 @@ import { fail, ok } from '../utils/http';
 const validCardDesigns = ['standard', 'gold'];
 const validSiteDesigns = ['classic', 'premium'];
 
+export const defaultDonationPage = {
+  eyebrow: 'Podrzi ligu',
+  title: 'Donacije za Duel Ligu',
+  intro: 'Svaka donacija pomaze da utakmice imaju bolju organizaciju, kvalitetniju opremu i sadrzaj koji publika moze da prati iz kola u kolo.',
+  impactTitle: 'Za sta se koristi podrska',
+  impactBody: 'Donacije se koriste za termine, lopte, marker opremu, osnovnu medicinsku opremu, snimanje najzanimljivijih trenutaka i odrzavanje platforme sa rezultatima, statistikama i najavama.',
+  paymentTitle: 'Kako mozes donirati',
+  paymentBody: 'Uplatu mozes poslati direktno na racun lige ili kontaktirati administratore ako zelis da podrzis konkretan termin, opremu ili medijski sadrzaj.',
+  bankAccount: 'RS35 0000 0000 0000 0000 00',
+  recipientName: 'Duel Liga',
+  paymentPurpose: 'Donacija za organizaciju lige',
+  ctaLabel: 'Kontakt za donaciju',
+  ctaUrl: 'mailto:admin@football.com',
+  imageUrl: '',
+  isPublished: true
+};
+
+const parseDonationPage = (value?: string | null) => {
+  if (!value) return defaultDonationPage;
+  try {
+    return { ...defaultDonationPage, ...JSON.parse(value) };
+  } catch {
+    return defaultDonationPage;
+  }
+};
+
 export const getSettings = async (_req: Request, res: Response) => {
   const [cardDesign, siteDesign] = await Promise.all([
     AppSetting.findByPk('cardDesign'),
@@ -36,6 +62,17 @@ export const updateSettings = async (req: Request, res: Response) => {
     cardDesign: validCardDesigns.includes(savedCardDesign?.value || '') ? savedCardDesign?.value : 'standard',
     siteDesign: validSiteDesigns.includes(savedSiteDesign?.value || '') ? savedSiteDesign?.value : 'classic'
   });
+};
+
+export const getDonationPage = async (_req: Request, res: Response) => {
+  const setting = await AppSetting.findByPk('donationPage');
+  return ok(res, parseDonationPage(setting?.value));
+};
+
+export const updateDonationPage = async (req: Request, res: Response) => {
+  const page = { ...defaultDonationPage, ...req.body };
+  await AppSetting.upsert({ key: 'donationPage', value: JSON.stringify(page) });
+  return ok(res, page);
 };
 
 export const getCmsBlocks = async (_req: Request, res: Response) => {

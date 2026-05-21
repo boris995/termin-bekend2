@@ -5,21 +5,25 @@ import {
   deleteCmsBlock,
   finishScheduledMatch,
   getCmsBlocks,
+  getDonationPage,
   getNextMatches,
   getSettings,
   startScheduledMatch,
   updateCmsBlock,
+  updateDonationPage,
   updateNextMatch,
   updateSettings
 } from '../controllers/cmsController';
 import { adminMiddleware, authMiddleware } from '../middleware/authMiddleware';
 import { validateBody } from '../middleware/validationMiddleware';
-import { cmsBlockSchema, cmsBlockUpdateSchema, finishNextMatchSchema, nextMatchSchema, nextMatchUpdateSchema } from '../validation/schemas';
+import { cmsBlockSchema, cmsBlockUpdateSchema, donationPageSchema, finishNextMatchSchema, nextMatchSchema, nextMatchUpdateSchema } from '../validation/schemas';
 
 export const cmsRoutes = Router();
 
 cmsRoutes.get('/settings', getSettings);
 cmsRoutes.put('/settings', authMiddleware, adminMiddleware, updateSettings);
+cmsRoutes.get('/donation-page', getDonationPage);
+cmsRoutes.put('/donation-page', authMiddleware, adminMiddleware, validateBody(donationPageSchema), updateDonationPage);
 cmsRoutes.get('/blocks', getCmsBlocks);
 cmsRoutes.post('/blocks', authMiddleware, adminMiddleware, validateBody(cmsBlockSchema), createCmsBlock);
 cmsRoutes.put('/blocks/:id', authMiddleware, adminMiddleware, validateBody(cmsBlockUpdateSchema), updateCmsBlock);

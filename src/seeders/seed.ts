@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { sequelize } from '../config/database';
 import { createMatch } from '../services/matchService';
-import { CmsBlock, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, Season, Team, User } from '../models';
+import { AppSetting, CmsBlock, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, Season, Team, User } from '../models';
 
 const avg = (ratings: { pac: number; sho: number; pas: number; dri: number; def: number; phy: number }) =>
   Math.round((ratings.pac + ratings.sho + ratings.pas + ratings.dri + ratings.def + ratings.phy) / 6);
@@ -367,6 +367,26 @@ const main = async () => {
       sortOrder: 3
     }
   ]);
+
+  await AppSetting.upsert({
+    key: 'donationPage',
+    value: JSON.stringify({
+      eyebrow: 'Podrzi ligu',
+      title: 'Donacije za Duel Ligu',
+      intro: 'Pomozite da svaki termin bude bolje organizovan, da rezultati i statistika ostanu uredni i da igraci imaju uslove kakve zasluzuju.',
+      impactTitle: 'Sta gradimo zajedno',
+      impactBody: 'Podrska ide u termine, lopte, marker opremu, prvu pomoc, snimanje akcija i odrzavanje sajta. Cilj je jednostavan: bolji fudbal, bolja evidencija i vise sadrzaja za publiku.',
+      paymentTitle: 'Podaci za uplatu',
+      paymentBody: 'Donaciju mozete poslati direktno na racun lige. Ako zelite da podrzite konkretan termin ili opremu, javite se admin timu pre uplate.',
+      bankAccount: 'RS35 0000 0000 0000 0000 00',
+      recipientName: 'Duel Liga',
+      paymentPurpose: 'Donacija za organizaciju lige',
+      ctaLabel: 'Kontaktiraj admina',
+      ctaUrl: 'mailto:admin@football.com',
+      imageUrl: '',
+      isPublished: true
+    })
+  });
 
   console.log('Seed zavrsen. Login: admin@football.com / admin123');
   await sequelize.close();
