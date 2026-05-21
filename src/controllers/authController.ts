@@ -1,12 +1,13 @@
 import bcrypt from 'bcrypt';
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { jwtSecret } from '../config/env';
 import { User } from '../models';
 import { fail, ok } from '../utils/http';
 import { AuthRequest } from '../middleware/authMiddleware';
 
 const publicUser = (user: User) => ({ id: user.id, name: user.name, email: user.email, role: user.role });
-const tokenFor = (user: User) => jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'change-me', { expiresIn: '7d' });
+const tokenFor = (user: User) => jwt.sign({ id: user.id }, jwtSecret(), { expiresIn: '7d' });
 
 export const register = async (req: Request, res: Response) => {
   try {

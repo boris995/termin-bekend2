@@ -11,7 +11,7 @@ const start = async () => {
   await sequelize.authenticate();
   await sequelize.sync();
   app.listen(port, () => {
-    console.log(`Football Face-Off API radi na http://localhost:${port}`);
+    console.log(`Football Face-Off API radi na portu ${port}`);
   });
   await activateDueNextMatches();
   setInterval(() => {

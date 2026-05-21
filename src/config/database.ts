@@ -1,8 +1,10 @@
 import dotenv from 'dotenv';
 import { Sequelize } from 'sequelize';
+import { requireEnv } from './env';
 
 dotenv.config();
 
+const isProduction = process.env.NODE_ENV === 'production';
 const sslEnabled = process.env.DB_SSL === 'true';
 const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
 
@@ -43,6 +45,13 @@ const createSequelize = () => {
       logging: false,
       dialectOptions: getDialectOptions()
     });
+  }
+
+  if (isProduction) {
+    requireEnv('DB_HOST');
+    requireEnv('DB_NAME');
+    requireEnv('DB_USER');
+    requireEnv('DB_PASSWORD');
   }
 
   return new Sequelize(
