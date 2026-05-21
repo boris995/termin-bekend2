@@ -20,15 +20,24 @@ dotenv.config();
 
 export const app = express();
 
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://127.0.0.1:5173')
+const allowedOrigins = (process.env.FRONTEND_URL || process.env.FRONTEND_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const isOriginAllowed = (origin: string) =>
+  allowedOrigins.some((allowedOrigin) => {
+    if (allowedOrigin === origin) return true;
+    if (!allowedOrigin.includes('*')) return false;
+
+    const pattern = new RegExp(`^${allowedOrigin.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*')}$`);
+    return pattern.test(origin);
+  });
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || isOriginAllowed(origin)) return callback(null, true);
       return callback(new Error(`CORS origin nije dozvoljen: ${origin}`));
     }
   })
