@@ -47,6 +47,15 @@ export const playerStatSchema = z.object({
   assists: z.coerce.number().int().min(0).default(0)
 });
 
+export const matchTimelineEventSchema = z.object({
+  minute: z.string().trim().min(1).max(8),
+  type: z.enum(['goal', 'yellow-card', 'red-card', 'note']).default('goal'),
+  teamId: id.optional().nullable(),
+  playerId: id.optional().nullable(),
+  assistPlayerId: id.optional().nullable(),
+  description: optionalString
+});
+
 export const matchSchema = z.object({
   seasonId: id,
   homeTeamId: id,
@@ -57,6 +66,8 @@ export const matchSchema = z.object({
   startedAt: z.coerce.date().optional(),
   endedAt: z.coerce.date().optional(),
   votingEnabled: z.coerce.boolean().default(true),
+  reportSummary: optionalString,
+  timelineEvents: z.array(matchTimelineEventSchema).optional().default([]),
   playerStats: z.array(playerStatSchema).optional().default([])
 });
 
@@ -65,6 +76,8 @@ export const finishNextMatchSchema = z.object({
   awayScore: z.coerce.number().int().min(0),
   endedAt: z.coerce.date().optional(),
   votingEnabled: z.coerce.boolean().default(true),
+  reportSummary: optionalString,
+  timelineEvents: z.array(matchTimelineEventSchema).optional().default([]),
   playerStats: z.array(playerStatSchema).min(1)
 });
 

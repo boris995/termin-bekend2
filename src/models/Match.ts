@@ -2,6 +2,16 @@ import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../config/database';
 
 export type MatchStatus = 'played' | 'cancelled';
+export type MatchTimelineEventType = 'goal' | 'yellow-card' | 'red-card' | 'note';
+
+export interface MatchTimelineEvent {
+  minute: string;
+  type: MatchTimelineEventType;
+  teamId?: number | null;
+  playerId?: number | null;
+  assistPlayerId?: number | null;
+  description?: string | null;
+}
 
 interface MatchAttributes {
   id: number;
@@ -16,10 +26,12 @@ interface MatchAttributes {
   startedAt?: Date | null;
   endedAt?: Date | null;
   votingEnabled: boolean;
+  reportSummary?: string | null;
+  timelineEvents?: MatchTimelineEvent[] | null;
   status: MatchStatus;
 }
 
-type MatchCreationAttributes = Optional<MatchAttributes, 'id' | 'winnerTeamId' | 'playedAt' | 'startedAt' | 'endedAt' | 'votingEnabled' | 'status'>;
+type MatchCreationAttributes = Optional<MatchAttributes, 'id' | 'winnerTeamId' | 'playedAt' | 'startedAt' | 'endedAt' | 'votingEnabled' | 'reportSummary' | 'timelineEvents' | 'status'>;
 
 export class Match extends Model<MatchAttributes, MatchCreationAttributes> implements MatchAttributes {
   declare id: number;
@@ -34,6 +46,8 @@ export class Match extends Model<MatchAttributes, MatchCreationAttributes> imple
   declare startedAt: Date | null;
   declare endedAt: Date | null;
   declare votingEnabled: boolean;
+  declare reportSummary: string | null;
+  declare timelineEvents: MatchTimelineEvent[] | null;
   declare status: MatchStatus;
 }
 
@@ -51,6 +65,8 @@ Match.init(
     startedAt: { type: DataTypes.DATE, allowNull: true },
     endedAt: { type: DataTypes.DATE, allowNull: true },
     votingEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    reportSummary: { type: DataTypes.TEXT, allowNull: true },
+    timelineEvents: { type: DataTypes.JSON, allowNull: true },
     status: { type: DataTypes.ENUM('played', 'cancelled'), allowNull: false, defaultValue: 'played' }
   },
   {

@@ -6,6 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "migrate": "ts-node-dev --transpile-only --exit-child src/scripts/migrate.ts",
     "seed": "ts-node-dev --transpile-only --exit-child src/seeders/seed.ts",
     "seed:reset": "set SEED_FORCE=true&& ts-node-dev --transpile-only --exit-child src/seeders/seed.ts",
     "test": "ts-node-dev --transpile-only --exit-child src/tests/smoke.ts"

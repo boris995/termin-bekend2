@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
 import { AppSetting, CmsBlock, NextMatch, Team } from '../models';
+import { logAdminAction } from '../services/auditService';
 import { activateDueNextMatches, finishNextMatch, startNextMatch } from '../services/matchService';
 import { fail, ok } from '../utils/http';
 
@@ -43,7 +45,7 @@ export const getSettings = async (_req: Request, res: Response) => {
   });
 };
 
-export const updateSettings = async (req: Request, res: Response) => {
+export const updateSettings = async (req: AuthRequest, res: Response) => {
   const { cardDesign, siteDesign } = req.body;
   if (cardDesign !== undefined && !validCardDesigns.includes(cardDesign)) return fail(res, 'Dizajn kartice mora biti standard ili gold.');
   if (siteDesign !== undefined && !validSiteDesigns.includes(siteDesign)) return fail(res, 'Dizajn sajta mora biti classic ili premium.');
@@ -58,10 +60,12 @@ export const updateSettings = async (req: Request, res: Response) => {
     AppSetting.findByPk('cardDesign'),
     AppSetting.findByPk('siteDesign')
   ]);
-  return ok(res, {
+  const payload = {
     cardDesign: validCardDesigns.includes(savedCardDesign?.value || '') ? savedCardDesign?.value : 'standard',
     siteDesign: validSiteDesigns.includes(savedSiteDesign?.value || '') ? savedSiteDesign?.value : 'classic'
-  });
+  };
+  await logAdminAction(req, { action: 'settings', entityType: 'app_settings', entityId: 'site-design', label: 'Dizajn sajta', metadata: payload });
+  return ok(res, payload);
 };
 
 export const getDonationPage = async (_req: Request, res: Response) => {
@@ -69,9 +73,10 @@ export const getDonationPage = async (_req: Request, res: Response) => {
   return ok(res, parseDonationPage(setting?.value));
 };
 
-export const updateDonationPage = async (req: Request, res: Response) => {
+export const updateDonationPage = async (req: AuthRequest, res: Response) => {
   const page = { ...defaultDonationPage, ...req.body };
   await AppSetting.upsert({ key: 'donationPage', value: JSON.stringify(page) });
+  await logAdminAction(req, { action: 'settings', entityType: 'app_settings', entityId: 'donationPage', label: 'Donacija stranica' });
   return ok(res, page);
 };
 
@@ -80,28 +85,32 @@ export const getCmsBlocks = async (_req: Request, res: Response) => {
   return ok(res, blocks);
 };
 
-export const createCmsBlock = async (req: Request, res: Response) => {
+export const createCmsBlock = async (req: AuthRequest, res: Response) => {
   try {
     const { title, body, type = 'text', imageUrl, sortOrder = 0, isPublished = true } = req.body;
     if (!title || !body) return fail(res, 'Naslov i sadrzaj su obavezni.');
     const block = await CmsBlock.create({ title, body, type, imageUrl, sortOrder, isPublished });
+    await logAdminAction(req, { action: 'create', entityType: 'cms_block', entityId: block.id, label: block.title });
     return ok(res, block, 201);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'CMS sadrzaj nije kreiran.');
   }
 };
 
-export const updateCmsBlock = async (req: Request, res: Response) => {
+export const updateCmsBlock = async (req: AuthRequest, res: Response) => {
   const block = await CmsBlock.findByPk(Number(req.params.id));
   if (!block) return fail(res, 'CMS sadrzaj nije pronadjen.', 404);
   await block.update(req.body);
+  await logAdminAction(req, { action: 'update', entityType: 'cms_block', entityId: block.id, label: block.title });
   return ok(res, block);
 };
 
-export const deleteCmsBlock = async (req: Request, res: Response) => {
+export const deleteCmsBlock = async (req: AuthRequest, res: Response) => {
   const block = await CmsBlock.findByPk(Number(req.params.id));
   if (!block) return fail(res, 'CMS sadrzaj nije pronadjen.', 404);
+  const label = block.title;
   await block.destroy();
+  await logAdminAction(req, { action: 'delete', entityType: 'cms_block', entityId: Number(req.params.id), label });
   return ok(res, { id: Number(req.params.id) });
 };
 
@@ -111,7 +120,7 @@ export const getNextMatches = async (_req: Request, res: Response) => {
   return ok(res, matches);
 };
 
-export const createNextMatch = async (req: Request, res: Response) => {
+export const createNextMatch = async (req: AuthRequest, res: Response) => {
   try {
     const { seasonId, homeTeamId, awayTeamId, scheduledAt, venue, note } = req.body;
     if (!seasonId || !homeTeamId || !awayTeamId || !scheduledAt) return fail(res, 'Sezona, obje ekipe i termin su obavezni.');
@@ -121,31 +130,35 @@ export const createNextMatch = async (req: Request, res: Response) => {
     if (teamCount !== 2) return fail(res, 'Obje ekipe moraju pripadati izabranoj sezoni.');
 
     const match = await NextMatch.create({ seasonId, homeTeamId, awayTeamId, scheduledAt, venue, note });
+    await logAdminAction(req, { action: 'create', entityType: 'next_match', entityId: match.id, label: 'Najava utakmice', metadata: { seasonId, homeTeamId, awayTeamId } });
     return ok(res, match, 201);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Najava utakmice nije kreirana.');
   }
 };
 
-export const updateNextMatch = async (req: Request, res: Response) => {
+export const updateNextMatch = async (req: AuthRequest, res: Response) => {
   const match = await NextMatch.findByPk(Number(req.params.id));
   if (!match) return fail(res, 'Najava nije pronadjena.', 404);
   await match.update(req.body);
+  await logAdminAction(req, { action: 'update', entityType: 'next_match', entityId: match.id, label: 'Najava utakmice', metadata: { status: match.status } });
   return ok(res, match);
 };
 
-export const startScheduledMatch = async (req: Request, res: Response) => {
+export const startScheduledMatch = async (req: AuthRequest, res: Response) => {
   try {
     const match = await startNextMatch(Number(req.params.id));
+    await logAdminAction(req, { action: 'start', entityType: 'next_match', entityId: Number(req.params.id), label: 'Pokrenuta najava utakmice' });
     return ok(res, match);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Utakmica nije pokrenuta.');
   }
 };
 
-export const finishScheduledMatch = async (req: Request, res: Response) => {
+export const finishScheduledMatch = async (req: AuthRequest, res: Response) => {
   try {
     const match = await finishNextMatch(Number(req.params.id), req.body);
+    if (match) await logAdminAction(req, { action: 'finish', entityType: 'next_match', entityId: Number(req.params.id), label: `Objavljen Matchday ${match.matchNumber}`, metadata: { matchId: match.id, seasonId: match.seasonId } });
     return ok(res, match);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Utakmica nije zavrsena.');

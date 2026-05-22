@@ -1,4 +1,5 @@
 import { AppSetting } from './AppSetting';
+import { AuditLog } from './AuditLog';
 import { Match } from './Match';
 import { MatchPlayerRating } from './MatchPlayerRating';
 import { MatchPlayerVote } from './MatchPlayerVote';
@@ -9,6 +10,9 @@ import { PlayerMatchStat } from './PlayerMatchStat';
 import { Season } from './Season';
 import { Team } from './Team';
 import { User } from './User';
+
+User.hasMany(AuditLog, { foreignKey: 'userId', as: 'auditLogs' });
+AuditLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 Season.hasMany(Team, { foreignKey: 'seasonId', as: 'teams', onDelete: 'CASCADE' });
 Team.belongsTo(Season, { foreignKey: 'seasonId', as: 'season' });
@@ -52,4 +56,4 @@ MatchPlayerVote.belongsTo(Match, { foreignKey: 'matchId', as: 'match' });
 Player.hasMany(MatchPlayerVote, { foreignKey: 'playerId', as: 'playerVotes', onDelete: 'CASCADE' });
 MatchPlayerVote.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
 
-export { AppSetting, CmsBlock, Match, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, PlayerMatchStat, Season, Team, User };
+export { AppSetting, AuditLog, CmsBlock, Match, MatchPlayerRating, MatchPlayerVote, NextMatch, Player, PlayerMatchStat, Season, Team, User };

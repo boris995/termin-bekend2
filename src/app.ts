@@ -4,12 +4,15 @@ import express, { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import './models';
+import { sequelize } from './config/database';
+import { auditRoutes } from './routes/auditRoutes';
 import { authRoutes } from './routes/authRoutes';
 import { dashboardRoutes } from './routes/dashboardRoutes';
 import { cmsRoutes } from './routes/cmsRoutes';
 import { homeRoutes } from './routes/homeRoutes';
 import { matchRoutes } from './routes/matchRoutes';
 import { playerRoutes } from './routes/playerRoutes';
+import { searchRoutes } from './routes/searchRoutes';
 import { seasonRoutes } from './routes/seasonRoutes';
 import { teamRoutes } from './routes/teamRoutes';
 import { uploadRoutes } from './routes/uploadRoutes';
@@ -50,9 +53,33 @@ app.use('/api', rateLimit({ windowMs: rateLimitWindowMs, limit: rateLimitMax, st
 app.use(express.json());
 app.use('/uploads', express.static(uploadRoot));
 
-app.get('/api/health', (_req, res) => res.json({ success: true, data: { status: 'ok' } }));
+app.get('/api/health', async (_req, res) => {
+  try {
+    await sequelize.authenticate();
+    return res.json({
+      success: true,
+      data: {
+        status: 'ok',
+        database: 'ok',
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (_error) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database health check nije prosao.',
+      data: {
+        status: 'error',
+        database: 'error',
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+});
 app.use('/api/auth', authRoutes);
+app.use('/api/audit-logs', auditRoutes);
 app.use('/api/home', homeRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/cms', cmsRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/seasons', seasonRoutes);

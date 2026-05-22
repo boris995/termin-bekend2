@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
 import { Player, PlayerMatchStat, Team } from '../models';
+import { logAdminAction } from '../services/auditService';
 import { fail, ok } from '../utils/http';
 
 const ratingKeys = ['pac', 'sho', 'pas', 'dri', 'def', 'phy'] as const;
@@ -32,7 +34,7 @@ export const getPlayer = async (req: Request, res: Response) => {
   return ok(res, { ...player.toJSON(), matchStats });
 };
 
-export const createPlayer = async (req: Request, res: Response) => {
+export const createPlayer = async (req: AuthRequest, res: Response) => {
   try {
     const {
       firstName,
@@ -81,13 +83,14 @@ export const createPlayer = async (req: Request, res: Response) => {
       phy,
       overallRating
     });
+    await logAdminAction(req, { action: 'create', entityType: 'player', entityId: player.id, label: `${player.firstName} ${player.lastName}`, metadata: { seasonId, teamId } });
     return ok(res, player, 201);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Igrac nije kreiran.');
   }
 };
 
-export const updatePlayer = async (req: Request, res: Response) => {
+export const updatePlayer = async (req: AuthRequest, res: Response) => {
   const player = await Player.findByPk(Number(req.params.id));
   if (!player) return fail(res, 'Igrac nije pronadjen.', 404);
 
@@ -104,12 +107,16 @@ export const updatePlayer = async (req: Request, res: Response) => {
   }
 
   await player.update(next);
+  await logAdminAction(req, { action: 'update', entityType: 'player', entityId: player.id, label: `${player.firstName} ${player.lastName}`, metadata: { seasonId: player.seasonId, teamId: player.teamId } });
   return ok(res, player);
 };
 
-export const deletePlayer = async (req: Request, res: Response) => {
+export const deletePlayer = async (req: AuthRequest, res: Response) => {
   const player = await Player.findByPk(Number(req.params.id));
   if (!player) return fail(res, 'Igrac nije pronadjen.', 404);
+  const label = `${player.firstName} ${player.lastName}`;
+  const metadata = { seasonId: player.seasonId, teamId: player.teamId };
   await player.destroy();
+  await logAdminAction(req, { action: 'delete', entityType: 'player', entityId: Number(req.params.id), label, metadata });
   return ok(res, { id: Number(req.params.id) });
 };

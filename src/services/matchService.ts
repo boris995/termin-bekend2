@@ -1,6 +1,7 @@
 import { Op, Transaction } from 'sequelize';
 import { sequelize } from '../config/database';
 import { Match, MatchPlayerRating, MatchPlayerVote, NextMatch, PlayerMatchStat, Season, Team } from '../models';
+import type { MatchTimelineEvent } from '../models/Match';
 import { deleteStatsForMatch, getPlayersFromMatch, recalculatePlayers, validatePlayersBelongToSeason } from './statsService';
 
 export interface PlayerStatInput {
@@ -20,6 +21,8 @@ export interface MatchInput {
   startedAt?: Date;
   endedAt?: Date;
   votingEnabled?: boolean;
+  reportSummary?: string | null;
+  timelineEvents?: MatchTimelineEvent[];
   playerStats?: PlayerStatInput[];
 }
 
@@ -30,24 +33,45 @@ const winnerFromScore = (input: MatchInput) => {
   return input.homeScore > input.awayScore ? input.homeTeamId : input.awayTeamId;
 };
 
-const assertValidMatch = async (input: MatchInput, transaction?: Transaction) => {
+const assertValidMatch = async (input: MatchInput, transaction?: Transaction, options: { allowCompletedSeason?: boolean } = {}) => {
   if (input.homeTeamId === input.awayTeamId) throw new Error('Domaca i gostujuca ekipa moraju biti razlicite.');
   if (input.homeScore < 0 || input.awayScore < 0) throw new Error('Rezultat ne moze biti negativan.');
 
   const season = await Season.findByPk(input.seasonId, { transaction });
   if (!season) throw new Error('Sezona nije pronadjena.');
-  if (season.status !== 'active') throw new Error('Sezona nije aktivna.');
+  if (season.status !== 'active' && !(options.allowCompletedSeason && season.status === 'completed')) throw new Error('Sezona nije aktivna.');
 
   const teamCount = await Team.count({ where: { seasonId: input.seasonId, id: [input.homeTeamId, input.awayTeamId] }, transaction });
   if (teamCount !== 2) throw new Error('Obje ekipe moraju pripadati izabranoj sezoni.');
 
   const playerIds = input.playerStats?.map((stat) => Number(stat.playerId)) || [];
-  if (playerIds.length && !(await validatePlayersBelongToSeason(input.seasonId, playerIds))) {
+  const timelinePlayerIds = (input.timelineEvents || [])
+    .flatMap((event) => [event.playerId, event.assistPlayerId])
+    .filter((playerId): playerId is number => Boolean(playerId));
+  const allPlayerIds = Array.from(new Set([...playerIds, ...timelinePlayerIds]));
+  if (allPlayerIds.length && !(await validatePlayersBelongToSeason(input.seasonId, allPlayerIds))) {
     throw new Error('Svi igraci u statistici moraju pripadati izabranoj sezoni.');
   }
 
+  const allowedTeamIds = [Number(input.homeTeamId), Number(input.awayTeamId)];
+  const invalidTimelineTeam = (input.timelineEvents || []).some((event) => event.teamId && !allowedTeamIds.includes(Number(event.teamId)));
+  if (invalidTimelineTeam) throw new Error('Timeline dogadjaji mogu pripadati samo ekipama iz utakmice.');
+
   return season;
 };
+
+const normalizedTimeline = (events: MatchTimelineEvent[] = []) =>
+  events
+    .map((event) => ({
+      minute: String(event.minute || '').trim(),
+      type: event.type || 'goal',
+      teamId: event.teamId ? Number(event.teamId) : null,
+      playerId: event.playerId ? Number(event.playerId) : null,
+      assistPlayerId: event.assistPlayerId ? Number(event.assistPlayerId) : null,
+      description: event.description?.trim() || null
+    }))
+    .filter((event) => event.minute)
+    .sort((a, b) => parseInt(a.minute, 10) - parseInt(b.minute, 10));
 
 const saveStats = async (matchId: number, stats: PlayerStatInput[], transaction: Transaction) => {
   if (!stats.length) return;
@@ -102,7 +126,9 @@ const createMatchInTransaction = async (input: MatchInput, transaction: Transact
       playedAt: endedAt,
       startedAt: input.startedAt || null,
       endedAt,
-      votingEnabled: input.votingEnabled ?? true
+      votingEnabled: input.votingEnabled ?? true,
+      reportSummary: input.reportSummary || null,
+      timelineEvents: normalizedTimeline(input.timelineEvents)
     },
     { transaction }
   );
@@ -123,17 +149,35 @@ export const updateMatch = async (id: number, input: MatchInput) =>
   sequelize.transaction(async (transaction) => {
     const match = await Match.findByPk(id, { transaction });
     if (!match) throw new Error('Utakmica nije pronadjena.');
+    const oldSeasonId = match.seasonId;
     const oldPlayerIds = await getPlayersFromMatch(match.id, transaction);
-    await assertValidMatch(input, transaction);
+    await assertValidMatch(input, transaction, { allowCompletedSeason: true });
     const winnerTeamId = winnerFromScore(input);
 
-    await match.update({ ...input, winnerTeamId, playedAt: input.playedAt || input.endedAt || match.playedAt }, { transaction });
+    await match.update(
+      {
+        seasonId: input.seasonId,
+        homeTeamId: input.homeTeamId,
+        awayTeamId: input.awayTeamId,
+        homeScore: input.homeScore,
+        awayScore: input.awayScore,
+        winnerTeamId,
+        playedAt: input.playedAt || input.endedAt || match.playedAt,
+        startedAt: input.startedAt || null,
+        endedAt: input.endedAt || input.playedAt || match.endedAt,
+        votingEnabled: input.votingEnabled ?? true,
+        reportSummary: input.reportSummary || null,
+        timelineEvents: normalizedTimeline(input.timelineEvents)
+      },
+      { transaction }
+    );
     await deleteStatsForMatch(match.id, transaction);
 
     const stats = input.playerStats || [];
     await saveStats(match.id, stats, transaction);
 
     await recalculatePlayers([...oldPlayerIds, ...stats.map((stat) => stat.playerId)], transaction);
+    if (oldSeasonId !== input.seasonId) await refreshSeasonState(oldSeasonId, transaction);
     await refreshSeasonState(input.seasonId, transaction);
     return Match.findByPk(match.id, { include: matchInclude, transaction });
   });
@@ -182,6 +226,8 @@ export const finishNextMatch = async (id: number, input: Omit<MatchInput, 'seaso
         endedAt,
         playedAt: endedAt,
         votingEnabled: input.votingEnabled ?? true,
+        reportSummary: input.reportSummary || null,
+        timelineEvents: normalizedTimeline(input.timelineEvents),
         playerStats: input.playerStats || []
       },
       transaction

@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
 import { Match } from '../models';
+import { logAdminAction } from '../services/auditService';
 import { createMatch, deleteMatch, getMatchVotingSummary, rateMatchPlayer, updateMatch, voteMatchPlayer } from '../services/matchService';
 import { fail, ok } from '../utils/http';
 
@@ -17,27 +19,31 @@ export const getMatch = async (req: Request, res: Response) => {
   return ok(res, { ...match.toJSON(), ...voting });
 };
 
-export const postMatch = async (req: Request, res: Response) => {
+export const postMatch = async (req: AuthRequest, res: Response) => {
   try {
     const match = await createMatch(req.body);
+    if (match) await logAdminAction(req, { action: 'create', entityType: 'match', entityId: match.id, label: `Matchday ${match.matchNumber}`, metadata: { seasonId: match.seasonId } });
     return ok(res, match, 201);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Utakmica nije kreirana.');
   }
 };
 
-export const putMatch = async (req: Request, res: Response) => {
+export const putMatch = async (req: AuthRequest, res: Response) => {
   try {
     const match = await updateMatch(Number(req.params.id), req.body);
+    if (match) await logAdminAction(req, { action: 'update', entityType: 'match', entityId: match.id, label: `Matchday ${match.matchNumber}`, metadata: { seasonId: match.seasonId } });
     return ok(res, match);
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Utakmica nije izmijenjena.');
   }
 };
 
-export const removeMatch = async (req: Request, res: Response) => {
+export const removeMatch = async (req: AuthRequest, res: Response) => {
   try {
+    const match = await Match.findByPk(Number(req.params.id));
     await deleteMatch(Number(req.params.id));
+    await logAdminAction(req, { action: 'delete', entityType: 'match', entityId: Number(req.params.id), label: match ? `Matchday ${match.matchNumber}` : null, metadata: { seasonId: match?.seasonId } });
     return ok(res, { id: Number(req.params.id) });
   } catch (error) {
     return fail(res, error instanceof Error ? error.message : 'Utakmica nije obrisana.');

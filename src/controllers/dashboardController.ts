@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Match, Player, Season, Team } from '../models';
+import { getVotingAnalyticsForSeason } from '../services/votingAnalyticsService';
 import { fail, ok } from '../utils/http';
 
 export const getSeasonDashboard = async (req: Request, res: Response) => {
@@ -21,4 +22,10 @@ export const getSeasonDashboard = async (req: Request, res: Response) => {
   const totalMatchesPlayed = await Match.count({ where: { seasonId, status: 'played' } });
 
   return ok(res, { season, teams: teamStats, topScorers, topAssists, totalMatchesPlayed });
+};
+
+export const getSeasonVotingAnalytics = async (req: Request, res: Response) => {
+  const analytics = await getVotingAnalyticsForSeason(Number(req.params.seasonId));
+  if (!analytics) return fail(res, 'Sezona nije pronadjena.', 404);
+  return ok(res, analytics);
 };
